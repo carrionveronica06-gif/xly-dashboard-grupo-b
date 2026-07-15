@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>XLY B1 · Orgánico vence sin invertir · Dashboard Conectado</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<style>
+:root{--verde:#7BA890;--verde-oscuro:#4E6E5D;--crema:#F5F1E8;--tinta:#2E332E;--suave:#EDF2ED;--alerta:#D4A373;--peligro:#C75B5B;--exito:#5B8C5A;}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--crema);color:var(--tinta);line-height:1.5}
+.container{max-width:1200px;margin:0 auto;padding:16px}
+.banner{background:var(--tinta);color:var(--crema);padding:8px 16px;font-size:12px;text-align:center;letter-spacing:.5px}
+.hero{background:linear-gradient(135deg,var(--verde)0%,var(--verde-oscuro)100%);color:#fff;padding:40px 24px;text-align:center;border-radius:0 0 24px 24px;margin-bottom:24px}
+.hero .eyebrow{font-size:14px;text-transform:uppercase;letter-spacing:2px;opacity:.9;margin-bottom:8px}
+.hero h1{font-size:72px;font-weight:800;line-height:1;margin-bottom:8px}
+.hero .comparison{font-size:16px;opacity:.95;margin-top:8px}
+.hero .negative{color:#FFD6D6;font-weight:700}
+.hero .positive{color:#D6FFD6;font-weight:700}
+.filters{display:flex;gap:12px;margin-bottom:24px;flex-wrap:wrap}
+.filters select{flex:1;min-width:140px;padding:12px 16px;border:2px solid var(--verde);border-radius:12px;background:#fff;font-size:14px;color:var(--tinta);cursor:pointer}
+.block{background:#fff;border-radius:16px;padding:24px;margin-bottom:24px;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+.block h2{font-size:20px;font-weight:700;margin-bottom:16px;color:var(--verde-oscuro);display:flex;align-items:center;gap:8px}
+.block h2::before{content:'';display:inline-block;width:4px;height:20px;background:var(--verde);border-radius:2px}
+.chart-grid{display:grid;grid-template-columns:1fr;gap:24px}
+@media(min-width:768px){.chart-grid{grid-template-columns:1fr 1fr}}
+.chart-box{position:relative;height:300px}
+.table-comp{overflow-x:auto;margin-top:16px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--suave)}
+th{background:var(--suave);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--verde-oscuro)}
+tr:hover{background:var(--crema)}
+.tag{display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600}
+.tag-org{background:#D6EADF;color:#2D5A3D}
+.tag-paid{background:#FADFC7;color:#7A4A1F}
+.tag-mix{background:#E8E0F0;color:#4A3A5C}
+.tag-pendiente{background:#FFF3CD;color:#856404}
+.insight{background:var(--tinta);color:var(--crema);padding:20px 24px;border-radius:12px;font-size:15px;margin-top:8px}
+.insight strong{color:var(--verde)}
+.kpi-row{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:16px}
+@media(min-width:768px){.kpi-row{grid-template-columns:repeat(4,1fr)}}
+.kpi-card{background:var(--suave);padding:16px;border-radius:12px;text-align:center}
+.kpi-card .value{font-size:28px;font-weight:800;color:var(--verde-oscuro)}
+.kpi-card .label{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#666;margin-top:4px}
+.updated{text-align:right;font-size:11px;color:#888;margin-top:8px}
+.loading{opacity:.5;pointer-events:none}
+.btn{background:var(--verde);color:#fff;border:none;padding:8px 16px;border-radius:8px;font-size:13px;cursor:pointer;font-weight:600}
+.btn:hover{background:var(--verde-oscuro)}
+#refresh-wrap{text-align:right;margin-bottom:12px}
+</style>
+</head>
+<body>
+<div class="banner">Demo educativa · ESIC MUDM0024 · Xuan Lan Yoga · Ángulo B1: Orgánico vence sin invertir · Dashboard conectado a Sheet vivo</div>
+
+<div class="hero">
+<div class="eyebrow">North Star · Active Paying Users</div>
+<h1 id="hero-value">—</h1>
+<div class="comparison">
+<span id="hero-vs-target">vs target 600 · <span class="negative">—</span></span> · 
+<span id="hero-vs-prev">vs mes ant. <span class="positive">—</span></span>
+</div>
+</div>
+
+<div class="container">
+<div id="refresh-wrap"><button class="btn" onclick="loadData()">↻ Actualizar</button></div>
+
+<div class="filters">
+<select id="filter-mes"><option value="all">Todos los meses</option></select>
+<select id="filter-canal"><option value="all">Todos los canales</option><option value="organico" selected>Orgánico (B1)</option><option value="paid">Paid</option></select>
+</div>
+
+<!-- BLOQUE 1: PLAN VS REAL -->
+<div class="block">
+<h2>① Plan vs Real — Evolución APU</h2>
+<div class="kpi-row">
+<div class="kpi-card"><div class="value" id="kpi-plan">600</div><div class="label">Target mes</div></div>
+<div class="kpi-card"><div class="value" id="kpi-real">—</div><div class="label">Real mes</div></div>
+<div class="kpi-card"><div class="value" id="kpi-gap">—</div><div class="label">Gap</div></div>
+<div class="kpi-card"><div class="value" id="kpi-yoy">—</div><div class="label">YoY</div></div>
+</div>
+<div class="chart-box"><canvas id="chart-apu"></canvas></div>
+</div>
+
+<!-- BLOQUE 2: MOTOR -->
+<div class="block">
+<h2>② Motor — Adquisición por canal + Retención RFM</h2>
+<div class="chart-grid">
+<div>
+<h3 style="font-size:14px;margin-bottom:12px;color:#555;">Funnel: sesiones → activados</h3>
+<div class="chart-box" style="height:260px"><canvas id="chart-funnel"></canvas></div>
+</div>
+<div>
+<h3 style="font-size:14px;margin-bottom:12px;color:#555;">Distribución RFM (% clientes)</h3>
+<div class="chart-box" style="height:260px"><canvas id="chart-rfm"></canvas></div>
+</div>
+</div>
+<div class="table-comp">
+<table>
+<thead><tr><th>Canal</th><th>Sesiones</th><th>Signups</th><th>Activados</th><th>CR ses→act</th><th>CAC</th><th>Revenue</th><th>Tipo</th></tr></thead>
+<tbody id="tabla-canales"></tbody>
+</table>
+</div>
+</div>
+
+<!-- BLOQUE 3: EXPERIMENTOS -->
+<div class="block">
+<h2>③ Experimentos — Priorización ICE</h2>
+<div class="table-comp">
+<table>
+<thead><tr><th>#</th><th>Hipótesis</th><th>Métrica</th><th>I</th><th>C</th><th>E</th><th>ICE</th><th>Estado</th></tr></thead>
+<tbody id="tabla-experimentos"></tbody>
+</table>
+</div>
+</div>
+
+<div class="insight" id="insight-box">
+<strong>Insight:</strong> Cargando datos desde Sheet vivo...
+</div>
+<div class="updated">Última actualización: <span id="updated">—</span></div>
+</div>
+
+<script>
+// === CONEXIÓN GVIZ (mapeo documentado — si cambias el Sheet, cambia esto) ===
+const SHEET_ID = '16cGewokbGcv8I40Bmjbg4gTaQpYJUBZqWtHenlcQHtk';
+const url = (sheet) => `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheet)}`;
+
+// === TARGETS DEL PLAN (definidos con /north-star-tree · esto ES el plan, no cambia solo) ===
+const TARGETS = {
+  apu_mes: 600,
+  cr_ses_signup_org: 0.20, // %
+  churn_m1_max: 35, // %
+  annual_share_min: 30, // %
+  cac_org_max: 50 // €
+};
+
+// === MAPEO DE COLUMNAS (defensive coding con ??) ===
+// adquisicion: mes, canal, inversion, revenue, sesiones, signups, free_trials, activados, cac
+// clientes_rfm: email, UserID, Recency_days, Frequency, Monetary_gross, R_score, F_score, M_score, RFM_SEGMENT, acq_channel, Primary_Product, n_revenue_lines, top_revenue_line
+// leads_captados: Marca temporal, Nombre, Email, Dirección de correo, Teléfono, ¿Cómo nos conociste?
+
+// === CANALES ORGÁNICOS (B1) ===
+const ORGANICOS = ['Búsqueda orgánica','Tráfico directo','Orgánico redes sociales','Fuentes sin conexión','Referidos','Otras campañas'];
+
+let charts = {};
+
+function safeNum(v) {
+  if (v === null || v === undefined || v === '') return 0;
+  // Spanish format: 1.234,56 → 1234.56 (dot=thousands, comma=decimal)
+  const n = parseFloat(String(v).replace(/[€\s]/g,'').replace(/\./g,'').replace(/,/g,'.'));
+  return isNaN(n) ? 0 : n;
+}
+
+function fmtNum(n) {
+  return new Intl.NumberFormat('es-ES',{maximumFractionDigits:0}).format(n);
+}
+
+function fmtPct(n) {
+  return new Intl.NumberFormat('es-ES',{style:'percent',minimumFractionDigits:2}).format(n);
+}
+
+async function loadData() {
+  document.body.classList.add('loading');
+  try {
+    const [adqText, rfmText, leadsText] = await Promise.all([
+      fetch(url('adquisicion')).then(r => r.text()).catch(() => ''),
+      fetch(url('clientes_rfm')).then(r => r.text()).catch(() => ''),
+      fetch(url('leads_captados')).then(r => r.text()).catch(() => '')
+    ]);
+
+    // Parse CSV
+    const A = Papa.parse(adqText, {header:true,dynamicTyping:true,skipEmptyLines:true}).data || [];
+    const R = Papa.parse(rfmText, {header:true,dynamicTyping:true,skipEmptyLines:true}).data || [];
+    const L = Papa.parse(leadsText, {header:true,dynamicTyping:true,skipEmptyLines:true}).data || [];
+
+    // === BLOQUE 1: APU por mes ===
+    const mesesMap = new Map();
+    A.forEach(row => {
+      const m = row.mes || row.Mes || row.MES;
+      if (!m) return;
+      const act = safeNum(row.activados ?? row.Activados ?? row.activado);
+      if (!mesesMap.has(m)) mesesMap.set(m, {activados:0, prev:0});
+      mesesMap.get(m).activados += act;
+    });
+    const mesesSorted = Array.from(mesesMap.keys()).sort();
+    const apuReal = mesesSorted.map(m => mesesMap.get(m).activados);
+    const apuTarget = mesesSorted.map(() => TARGETS.apu_mes);
+    const lastAPU = apuReal[apuReal.length-1] || 0;
+    const prevAPU = apuReal[apuReal.length-2] || 0;
+    const gapAPU = lastAPU - TARGETS.apu_mes;
+    const momAPU = prevAPU ? ((lastAPU - prevAPU)/prevAPU) : 0;
+    const yoyAPU = (apuReal.length > 12 && apuReal[apuReal.length-13]) ? ((lastAPU - apuReal[apuReal.length-13]) / apuReal[apuReal.length-13]) : 0;
+
+    document.getElementById('hero-value').textContent = fmtNum(lastAPU);
+    document.getElementById('hero-vs-target').innerHTML = `vs target ${TARGETS.apu_mes} · <span class="${gapAPU >= 0 ? 'positive' : 'negative'}">${gapAPU >= 0 ? '+' : ''}${fmtNum(gapAPU)}</span>`;
+    document.getElementById('hero-vs-prev').innerHTML = `vs mes ant. <span class="${momAPU >= 0 ? 'positive' : 'negative'}">${momAPU >= 0 ? '+' : ''}${fmtPct(momAPU)}</span>`;
+    document.getElementById('kpi-real').textContent = fmtNum(lastAPU);
+    document.getElementById('kpi-gap').textContent = (gapAPU >= 0 ? '+' : '') + fmtNum(gapAPU);
+    document.getElementById('kpi-yoy').textContent = (yoyAPU >= 0 ? '+' : '') + fmtPct(yoyAPU);
+
+    // Poblar filtro meses
+    const selMes = document.getElementById('filter-mes');
+    selMes.innerHTML = '<option value="all">Todos los meses</option>';
+    mesesSorted.slice(-12).forEach(m => {
+      const opt = document.createElement('option');
+      opt.value = m;
+      opt.textContent = m;
+      selMes.appendChild(opt);
+    });
+
+    // Chart APU
+    if (charts.apu) charts.apu.destroy();
+    charts.apu = new Chart(document.getElementById('chart-apu'), {
+      type: 'line',
+      data: {
+        labels: mesesSorted,
+        datasets: [
+          {label:'APU Real',data:apuReal,borderColor:'#7BA890',backgroundColor:'rgba(123,168,144,0.1)',fill:true,tension:0.3,pointRadius:4},
+          {label:'Target Plan',data:apuTarget,borderColor:'#D4A373',borderDash:[6,4],tension:0.3,pointRadius:0,fill:false}
+        ]
+      },
+      options: {responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},scales:{y:{beginAtZero:true,grid:{color:'#f0f0f0'}},x:{grid:{display:false}}}}
+    });
+
+    // === BLOQUE 2: Funnel por canal (último mes) ===
+    const lastMes = mesesSorted[mesesSorted.length-1];
+    const lastRows = A.filter(r => (r.mes || r.Mes || r.MES) === lastMes);
+    
+    const canalAgg = {};
+    lastRows.forEach(row => {
+      const c = row.canal || row.Canal || row.CANAL || 'Desconocido';
+      if (!canalAgg[c]) canalAgg[c] = {ses:0,sign:0,act:0,rev:0,inv:0};
+      canalAgg[c].ses += safeNum(row.sesiones ?? row.Sesiones);
+      canalAgg[c].sign += safeNum(row.signups ?? row.Signups);
+      canalAgg[c].act += safeNum(row.activados ?? row.Activados);
+      canalAgg[c].rev += safeNum(row.revenue ?? row.Revenue);
+      canalAgg[c].inv += safeNum(row.inversion ?? row.Inversion);
+    });
+
+    // Tabla canales
+    const tbody = document.getElementById('tabla-canales');
+    tbody.innerHTML = '';
+    let totalOrg = {ses:0,sign:0,act:0,rev:0,inv:0};
+    let totalPaid = {ses:0,sign:0,act:0,rev:0,inv:0};
+    
+    Object.entries(canalAgg).sort((a,b) => b[1].act - a[1].act).forEach(([c, d]) => {
+      const isOrg = ORGANICOS.includes(c) || d.inv === 0;
+      const cr = d.ses > 0 ? d.act / d.ses : 0;
+      const cac = d.act > 0 ? d.inv / d.act : 0;
+      const tag = isOrg ? '<span class="tag tag-org">Orgánico</span>' : '<span class="tag tag-paid">Paid</span>';
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td><strong>${c}</strong></td><td>${fmtNum(d.ses)}</td><td>${fmtNum(d.sign)}</td><td>${fmtNum(d.act)}</td><td>${fmtPct(cr)}</td><td>${cac > 0 ? fmtNum(cac)+'€' : '0€'}</td><td>${fmtNum(d.rev)}€</td><td>${tag}</td>`;
+      tbody.appendChild(tr);
+      if (isOrg) { totalOrg.ses += d.ses; totalOrg.sign += d.sign; totalOrg.act += d.act; totalOrg.rev += d.rev; totalOrg.inv += d.inv; }
+      else { totalPaid.ses += d.ses; totalPaid.sign += d.sign; totalPaid.act += d.act; totalPaid.rev += d.rev; totalPaid.inv += d.inv; }
+    });
+    // Totales
+    const crOrg = totalOrg.ses > 0 ? totalOrg.act / totalOrg.ses : 0;
+    const cacOrg = totalOrg.act > 0 ? totalOrg.inv / totalOrg.act : 0;
+    const crPaid = totalPaid.ses > 0 ? totalPaid.act / totalPaid.ses : 0;
+    const cacPaid = totalPaid.act > 0 ? totalPaid.inv / totalPaid.act : 0;
+    
+    const trOrg = document.createElement('tr');
+    trOrg.style.background = '#F5F1E8';
+    trOrg.innerHTML = `<td><strong>Total Orgánico</strong></td><td>${fmtNum(totalOrg.ses)}</td><td>${fmtNum(totalOrg.sign)}</td><td>${fmtNum(totalOrg.act)}</td><td>${fmtPct(crOrg)}</td><td>${cacOrg > 0 ? fmtNum(cacOrg)+'€' : '0€'}</td><td>${fmtNum(totalOrg.rev)}€</td><td><span class="tag tag-org">Orgánico</span></td>`;
+    tbody.insertBefore(trOrg, tbody.children[0] || null);
+    
+    const trPaid = document.createElement('tr');
+    trPaid.style.background = '#F5F1E8';
+    trPaid.innerHTML = `<td><strong>Total Paid</strong></td><td>${fmtNum(totalPaid.ses)}</td><td>${fmtNum(totalPaid.sign)}</td><td>${fmtNum(totalPaid.act)}</td><td>${fmtPct(crPaid)}</td><td>${cacPaid > 0 ? fmtNum(cacPaid)+'€' : '0€'}</td><td>${fmtNum(totalPaid.rev)}€</td><td><span class="tag tag-paid">Paid</span></td>`;
+    tbody.insertBefore(trPaid, tbody.children[1] || null);
+
+    // Chart Funnel
+    const funnelLabels = ['Sesiones','Signups','Trials','Activados'];
+    const funnelOrg = [totalOrg.ses, totalOrg.sign, totalOrg.sign, totalOrg.act]; // free_trials ≈ signups en data
+    const funnelPaid = [totalPaid.ses, totalPaid.sign, totalPaid.sign, totalPaid.act];
+    if (charts.funnel) charts.funnel.destroy();
+    charts.funnel = new Chart(document.getElementById('chart-funnel'), {
+      type: 'bar',
+      data: {labels:funnelLabels,datasets:[{label:'Orgánico',data:funnelOrg,backgroundColor:'#7BA890',borderRadius:6},{label:'Paid',data:funnelPaid,backgroundColor:'#D4A373',borderRadius:6}]},
+      options: {responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'}},scales:{y:{type:'logarithmic',grid:{color:'#f0f0f0'}},x:{grid:{display:false}}}}
+    });
+
+    // === BLOQUE 2: RFM ===
+    const rfmCounts = {};
+    R.forEach(row => {
+      const seg = row.RFM_SEGMENT || row['RFM_SEGMENT'] || row.rfm_segment || 'Desconocido';
+      rfmCounts[seg] = (rfmCounts[seg] || 0) + 1;
+    });
+    const totalR = R.length || 1;
+    const rfmLabels = Object.keys(rfmCounts).sort((a,b) => rfmCounts[b]-rfmCounts[a]);
+    const rfmData = rfmLabels.map(l => (rfmCounts[l]/totalR)*100);
+    const rfmColors = ['#5B8C5A','#7BA890','#A8C6A8','#D4A373','#E8C547','#C75B5B','#B8B8B8','#8B8B8B'];
+    if (charts.rfm) charts.rfm.destroy();
+    charts.rfm = new Chart(document.getElementById('chart-rfm'), {
+      type: 'doughnut',
+      data: {labels:rfmLabels,datasets:[{data:rfmData,backgroundColor:rfmColors.slice(0,rfmLabels.length),borderWidth:2,borderColor:'#fff'}]},
+      options: {responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{boxWidth:12,font:{size:11}}},tooltip:{callbacks:{label:(ctx)=>`${ctx.label}: ${ctx.raw.toFixed(1)}%`}}}}
+    });
+
+    // === BLOQUE 3: Experimentos (hardcodeados como semilla) ===
+    const experimentos = [
+      {h:'CTA agresivo en blog sube CR sesiones→signup orgánico de 0.04% a 0.20%',m:'CR ses→signup orgánico',i:8,c:6,e:7,ice:336,est:'Pendiente'},
+      {h:'Onboarding D0-D7 por email reduce churn M1 de Hibernating',m:'Churn M1',i:7,c:7,e:6,ice:294,est:'Pendiente'},
+      {h:'Descuento 20% en landing migra signup orgánico mensual a anual',m:'% Annual share',i:6,c:5,e:8,ice:240,est:'Pendiente'},
+      {h:'Programa referral Champions con CAC 10-20€ (S2)',m:'Referidos/mes',i:8,c:4,e:5,ice:160,est:'MVP'}
+    ];
+    const tbodyExp = document.getElementById('tabla-experimentos');
+    tbodyExp.innerHTML = '';
+    experimentos.forEach((ex,idx) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${idx+1}</td><td>${ex.h}</td><td>${ex.m}</td><td>${ex.i}</td><td>${ex.c}</td><td>${ex.e}</td><td><strong>${ex.ice}</strong></td><td><span class="tag tag-pendiente">${ex.est}</span></td>`;
+      tbodyExp.appendChild(tr);
+    });
+
+    // === INSIGHT ===
+    const insight = document.getElementById('insight-box');
+    const sesTotal = totalOrg.ses + totalPaid.ses;
+    const actTotal = totalOrg.act + totalPaid.act;
+    const crOrgPct = totalOrg.ses > 0 ? (totalOrg.act/totalOrg.ses)*100 : 0;
+    const cacOrgVal = totalOrg.act > 0 ? totalOrg.inv/totalOrg.act : 0;
+    const potencial = totalOrg.ses * 0.0020; // si CR fuera 0.20%
+    const ganancia = potencial - totalOrg.act;
+    insight.innerHTML = `<strong>Insight:</strong> El orgánico genera <strong>${fmtNum(totalOrg.ses)} sesiones</strong> (${((totalOrg.ses/sesTotal)*100).toFixed(0)}% del tráfico) pero solo <strong>${crOrgPct.toFixed(2)}% CR</strong> a activados. Un lead orgánico no es gratis: cuesta ~${cacOrgVal > 0 ? fmtNum(cacOrgVal) : '0'}€ de producción y <strong>${totalOrg.ses > 0 ? fmtNum(totalOrg.ses/totalOrg.act) : '—'} sesiones</strong> por cada activado. Si subes el CR del orgánico al 0.20%, ganarías <strong>+${fmtNum(ganancia)} activados/mes</strong> sin invertir un € más en tráfico.`;
+
+    document.getElementById('updated').textContent = new Date().toLocaleString('es-ES',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+
+  } catch (err) {
+    console.error('Error cargando datos:', err);
+    document.getElementById('insight-box').innerHTML = '<strong>Error:</strong> No se pudieron cargar los datos del Sheet. Verifica que el Sheet esté compartido como "Cualquiera con el enlace puede ver".';
+  } finally {
+    document.body.classList.remove('loading');
+  }
+}
+
+// Carga inicial + auto-refresh cada 60 min
+loadData();
+setInterval(loadData, 60 * 60 * 1000);
+</script>
+</body>
+</html>
